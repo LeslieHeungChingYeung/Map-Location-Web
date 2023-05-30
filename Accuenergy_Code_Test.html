@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Leaflet Geocoder Example</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
+  <link href="css/bootstrap.min.css" rel="stylesheet" type="text/css" />
+  <style>
+    #map {
+      height: 400px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    th, td {
+      padding: 8px;
+      text-align: left;
+      border-bottom: 1px solid #ddd;
+    }
+
+    .pagination {
+      display: flex;
+      justify-content: center;
+      margin-top: 16px;
+    }
+
+    .pagination a {
+      color: black;
+      float: left;
+      padding: 8px 16px;
+      text-decoration: none;
+      transition: background-color .3s;
+    }
+
+    .pagination a.active {
+      background-color: #4CAF50;
+      color: white;
+    }
+
+    .pagination a:hover:not(.active) {
+      background-color: #ddd;
+    }
+  </style>
+</head>
+<body>
+  <button type="button" class="btnGetLoc" id="btnGetLoc">Get Current Location</button>
+  <div id="map"></div>
+
+  <table id="placesTable">
+    <thead>
+      <tr>
+        <th>Select</th>
+        <th>Name</th>
+      </tr>
+    </thead>
+    <tbody>
+      <!-- Table rows will be dynamically generated here -->
+    </tbody>
+  </table>
+
+  <button id="prevButton">Previous</button> 
+  <button id="nextButton">Next</button> 
+
+  <button id="deleteButton" onclick="clearMarkersAndRows()">Delete Selected</button>
+
+  <script src="https://unpkg.com/jquery/dist/jquery.min.js"></script>
+  <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.js"></script>
+  <!-- Bootstrap -->
+<script src="js/bootstrap.min.js" type="text/javascript"></script>
+
+<!-- DATA TABES SCRIPT -->
+<script src="js/datatables/jquery.dataTables.js" type="text/javascript"></script>
+<script src="js/datatables/dataTables.bootstrap.js" type="text/javascript"></script>
+  <script>
+    // Initialize the map
+    var map = L.map('map').setView([51.505, -0.09], 13);
+
+    // Add the tile layer
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: 'Map data &copy; <a href="https://www.openstreetmap.org/">OpenStreetMap</a> contributors',
+      maxZoom: 18,
+    }).addTo(map);
+
+    //Current Location
+  L.DomEvent.on(document.getElementById('btnGetLoc'), 'click', function() {
+    map.locate({
+      setView: true,
+      maxZoom: 16
+    });
+  });
+
+  function onLocationFound(e) {
+    var radius = e.accuracy;
+
+    L.marker(e.latlng).addTo(map)
+      .bindPopup("You are within " + radius + " meters from this point").openPopup();
+
+    L.circle(e.latlng, radius).addTo(map);
+  }
+
+  map.on('locationfound', onLocationFound);
+
+    // Add the geocoder control
+    var geocoder = L.Control.geocoder({
+      defaultMarkGeocode: false,
+    })
+      .on('markgeocode', function (e) {
+
+        // Get the geocoded location
+        var location = e.geocode.center;
+        var name = e.geocode.name;
+        var lat = location.lat;
+        var lng = location.lng;
+
+        // Add a marker at the location
+        var marker = L.marker(location).addTo(map);
+
+        // Pan the map to the location
+        map.panTo(location);
+
+        // Create a table row with the location information
+        var row = $('<tr>').appendTo('#placesTable');
+
+        // Add a checkbox for row selection
+        $('<td>').html('<input type="checkbox" id = "checkbox">').appendTo(row);
+
+        // Add the name, latitude, and longitude
+        $('<td>').text(name).appendTo(row);
+
+        // Store the marker and row for later removal
+        markers.push(marker);
+        rows.push(row);
+        tablerow.push(name)
+        renderTable();
+        //alert(tablerow)
+      })
+      .addTo(map);
+
+    
+    // Function to clear existing markers
+    function clearMarkers() {
+        for (var i = 0; i < markers.length; i++) {
+            map.removeLayer(markers[i]);
+        }
+         markers = [];
+    }
+
+    // Store the markers and rows for removal
+    var markers = [];
+    var rows = [];
+    var tablerow = [];
+
+
+    document.addEventListener('DOMContentLoaded', init, false); 
+    const pageSize = 10;
+    let curPage = 1;
+
+    async function init() {
+    renderTable();
+  
+    document.querySelector('#nextButton').addEventListener('click', nextPage, false);
+    document.querySelector('#prevButton').addEventListener('click', previousPage, false);
+    }
+
+    // Function to clear existing markers and rows
+    function clearMarkersAndRows() {
+      clearMarkers();
+    /*
+      for (var i = 0; i < checkbox.length; i++) {
+        if (checkbox[i].checked ) {
+            rows[i].remove();
+        }
+      }*/
+      /*
+      document.querySelectorAll('#placesTable.select:checked').forEach(e => {
+            e.parentNode.parentNode.remove()
+        });
+    */
+        var table = document.getElementById("placesTable");
+        var index = 0;
+        while (index < table.rows.length) {
+            var input = table.rows[index].cells[0].children[0];
+            if (input && input.checked) {
+                table.deleteRow(index);
+                tablerow.splice(index, 1);
+            }else {
+                index++;
+            }
+        }
+
+    }
+
+    // Attach a click event listener to the delete button
+    /*
+    $('#deleteButton').on('click', function () {
+      var selectedRows = $('#placesTable input:checked').closest('tr');
+
+      if (selectedRows.length > 0) {
+        // Remove selected rows and their associated markers
+        selectedRows.each(function () {
+          var index = rows.indexOf($(this));
+          if (index > -1) {
+            map.removeLayer(markers[index]);
+            markers.splice(index, 1);
+            $(this).remove();
+          }
+        });
+      }
+    });
+    */
+    
+
+    // Pagination logic
+
+
+    function renderTable() {
+    // create html
+    let result = '';
+    tablerow.filter((row, index) => {
+        let start = (curPage-1)*pageSize;
+        let end =curPage*pageSize;
+        if(index >= start && index < end) return true;
+    }).forEach(c => {
+        result += `<tr>
+        <td><input type="checkbox" class="select"></td>
+        <td>${c}</td>
+        </tr>`;
+    });
+    placesTable.innerHTML = result;
+    }
+
+    function previousPage() {
+    if(curPage > 1) curPage--;
+    renderTable();
+    }
+
+    function nextPage() {
+    if((curPage * pageSize) < rows.length) curPage++;
+    renderTable();
+    }
+    
+  </script>
+</body>
+</html>
